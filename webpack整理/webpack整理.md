@@ -208,9 +208,9 @@ module.exports = {
 
 ![Mode的内置函数功能](./imgs/features.jpg)
 
-### 资源解析：
+### 资源解析
 
-- 解析ES6
+#### 解析ES6
 
 使用babel-loader
 
@@ -248,7 +248,7 @@ module.exports = {
 }
 ```
 
-- 解析CSS
+#### 解析CSS
 
 css-loader⽤用于加载.css ⽂文件，并且转换成commonjs 对象
 
@@ -273,7 +273,7 @@ module.exports = {
 
 webpack的loader是从右向左执行。css-loader处理完毕的数据交给style-loader。注意写法顺序。
 
-- 解析Less和Sass
+#### 解析Less和Sass
 
 less-loader ⽤用于将less 转换成css
 
@@ -294,7 +294,7 @@ module.exports = {
 }
 ```
 
-- 解析图片和字体
+#### 解析图片和字体
 
 file-loader ⽤用于处理理⽂文件
 
@@ -319,7 +319,7 @@ module.exports = {
 }
 ```
 
-- 使用 url-loader
+#### 使用 url-loader
 
 > url-loader 也可以处理理图⽚片和字体可以设置较⼩小资源自动base64
 
@@ -343,4 +343,200 @@ module.exports = {
 }
 ```
 
-- webpack 中的文件监听
+#### webpack 中的文件监听
+
+> 文件监听是在发现源码发生变化时候，自动重新构建出新的输出文件。
+
+webpack开启监听模式，有两种方式：
+
+- 启动webpack命令时，带上 --watch参数
+- 在配置webpack.config.js中设置watch: true
+
+唯一缺点：每次需要手动刷新浏览器
+
+- 文件监听原理分析
+
+轮询判断文件的最后编辑时间是否发生变化
+
+```js
+module.export = {
+  //默认false，也就是不不开启
+  watch: true,
+  //只有开启监听模式时，watchOptions才有意义
+  watchOptions: {
+    //默认为空，不监听的文件或者文件夹，支持正则匹配
+    ignored: /node_modules/,
+    //监听到变化发生后会等300ms再去执行，默认300ms
+    aggregateTimeout: 300,
+    //判断文件是否发生变化是通过不停询问系统指定文件有没有变化实现的，默认每秒问1000次
+    poll: 1000
+  }
+}
+
+```
+
+#### 热更新实现1 webpack-dev-server
+
+WDS 不不刷新浏览器器
+
+WDS 不不输出⽂文件，⽽而是放在内存中
+
+使⽤用HotModuleReplacementPlugin插件
+
+package.json中配置
+
+```json
+{
+  "scripts": {
+    "dev": "webpack-dev-server --open"
+  }
+}
+```
+
+webpack.config.js配置
+
+```js
+module.exports = {
+  plugins: [
+      new webpack.HotModuleReplacementPlugin()
+  ],
+  devServer: {
+      contentBase: './dist',
+      hot: true
+  }
+}
+
+```
+
+#### 热更新实现2 webpack-dev-middleware
+
+WDM 将webpack 输出的⽂文件传输给服务器器
+
+适⽤用于灵活的定制场景
+
+```js
+const express = require('express');
+const webpack = require('webpack');
+const webpackDevMiddleware = require('webpack-dev-middleware');
+const config = require('./webpack.config.js')
+const app = express();
+const compiler = webpack(config);
+
+app.use(webpackDevMiddleware(compiler, {
+    publicPath: config.output.publicPath
+}));
+
+app.listen(3000, function () {
+    console.log('Example app listening on port 3000!\n');
+});
+```
+
+#### 热更更新的原理理分析
+
+![热更更新的原理理分析](./imgs/hotServer.png)
+
+#### 文件指纹
+
+> 文件指纹就是打包后输出的文件名的后缀
+
+- Hash:和整个项⽬目的构建相关，只要项⽬目⽂文件有修改，整个项⽬目构建的hash 值就会更更改
+- Chunkhash:和webpack 打包的chunk 有关，不不同的entry 会⽣生成不不同的 chunkhash 值
+- Contenthash：根据⽂文件内容来定义hash,⽂文件内容不不变，则 contenthash 不不变
+
+##### JS的⽂文件指纹设置
+
+> 设置output 的filename，使⽤用`[chunkhash]`
+
+```js
+module.exports = {
+  output: {
+    filename: '[name]_[chunkhash:8].js'
+  }
+}
+```
+
+##### CSS的⽂文件指纹设置
+
+设置MiniCssExtractPlugin 的filename，使用`[contenthash]`
+
+```js
+module.exports = {
+  plugins: [
+    new MiniCssExtractPlugin({
+      filename: `[name][contenthash:8].css`
+    })
+  ]
+}
+```
+
+##### 图⽚片的⽂文件指纹设置
+
+设置file-loader 的name，使⽤用`[hash]`
+
+![各个占位符含义](./imgs/fileHash.jpg)
+
+```js
+module.exports = {
+  module: {
+    rules: [
+      {
+        test: /\.(png|svg|jpg|gif)$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: 'img/[name][hash:8].[ext]'
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 代码压缩
+
+#### JS文件的压缩
+
+内置了uglifyis-webpack-plugin
+
+#### CSS文件的压缩
+
+使用optimize-css-assets-webpack-plugin,同时使用 cssnano
+
+```js
+module.exports = {
+  plugins: [
+    new OptimizeCssAssetsPlugin({
+      assetNameRegExp: /\.css$/g,
+      cssProcessor: require('cssnano')
+    })
+  ]
+}
+```
+
+#### HTML文件的压缩
+
+修改html-webpack-plugin，设置压缩参数
+
+```js
+module.exports = {
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: path.join(__dirname, 'src/search.html'),
+      filename: 'search.html',
+      chunks: ['search'],
+      inject: true,
+      minify: {
+        html5: true,
+        collapseWhitespace: true,
+        preserveLineBreaks: false,
+        minifyCSS: true,
+        minifyJS: true,
+        removeComments: false
+      }
+    })
+  ]
+}
+```
